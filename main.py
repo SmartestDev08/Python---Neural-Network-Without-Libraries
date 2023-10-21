@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from math import e
 
 class Network():
     def __init__(self, layers): # Setup network information
@@ -65,8 +66,43 @@ class Network():
         self.weights = set_weights()
         self.bias = set_bias()
 
-        print(self.weights)
-        print(self.bias)
+    def predict(self, input): # Given an input, predict the output
+        if len(input) != self.input_size:
+            return
+
+        weights = self.weights
+        bias = self.bias
+        values = input
+
+        for i, layer in enumerate(self.hidden):
+            new_values = []
+
+            for n in range(layer["length"]):
+                sum1 = 0
+                for index, i2 in enumerate(weights[i][n]):
+                    sum1 += values[index] * i2
+                
+                sum1 += bias[i][n]
+                new_values.append(max(0, sum1))
+            
+            values = new_values
+        
+        new_values = []
+
+        for i in range(self.output):
+            sum1 = 0
+
+            for index, n in enumerate(weights[-1][i]):
+                sum1 += values[index] * n
+            
+            sum1 += bias[-1][i]
+            sum1 = 1 / (1 + (e**-sum1))
+
+            new_values.append(sum1)
+        
+        values = new_values
+
+        return values
 
 layers = {
     "input": {
@@ -79,7 +115,7 @@ layers = {
     "hidden": [
         {
             "length": 3,
-            "activation": "relu"
+            "activation": "sigmoid"
         }
     ]
 }
@@ -91,3 +127,6 @@ reset_settings = {
 network = Network(layers)
 
 network.reset(reset_settings)
+output = network.predict([1, 2])
+
+print(output)
