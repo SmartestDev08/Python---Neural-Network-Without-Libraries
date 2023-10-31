@@ -1,6 +1,9 @@
 import numpy as np
 import random
 from math import e
+from PIL import Image
+import os
+import itertools
 
 def copy_array(array):
     result = []
@@ -72,8 +75,14 @@ class Network():
             bias.append(output_bias)
 
             return bias
+        
+        if settings["preset_weights"] == None:
+            self.weights = set_weights()
+        else:
+            arr = np.load(f"{settings['preset_weights']}.npy")
+            arr = arr.tolist()
 
-        self.weights = set_weights()
+            self.weights = arr
         self.bias = set_bias()
 
     def predict(self, input, train = False): # Given an input, predict the output
@@ -113,6 +122,11 @@ class Network():
         values.append(new_values)
 
         if not train:
+            for i, n in enumerate(values[-1]):
+                #print(n)
+                #print(round(n, 5))
+                values[-1][i] = round(n, 5)
+            
             return values[-1]
         else:
             return values
@@ -183,9 +197,14 @@ class Network():
                     new_weights[index1][index2][index3] = weight - (learning_rate * C_w)
         self.weights = new_weights
 
+    def saveWeights(self, name):
+        weights = self.weights
+
+        arr = np.array(weights, dtype=object)
+        np.save(f"{name}.npy", arr)
 layers = {
     "input": {
-        "length": 2
+        "length": 256
     },
     "output": {
         "length": 2,
@@ -193,79 +212,72 @@ layers = {
     },
     "hidden": [
         {
-            "length": 3,
+            "length": 23,
+            "activation": "sigmoid"
+        },
+        {
+            "length": 8,
             "activation": "sigmoid"
         }
     ]
 }
 reset_settings = {
     "weights_range": [-1, 1],
-    "bias_range": [-1, 1]
+    "bias_range": [-1, 1],
+    "preset_weights": None
 }
+
+def imageToArray(imgPath):
+    img = Image.open(imgPath)
+    pixels = np.asarray(img)
+    pixels = pixels.tolist()
+
+    for i1, row in enumerate(pixels):
+        for i2, pix in enumerate(row):
+            pixels[i1][i2] = int(pix[0] == 0)
+    
+    pixels = list(itertools.chain.from_iterable(pixels))
+
+    return pixels
+
+data = []
+
+dataset_directory = "dataset"
+
+for filename in os.listdir(dataset_directory):
+    exp_out = [1, 0] # Circle, Cross
+    if "cross" in filename:
+        exp_out = [0, 1]
+    
+    data.append([imageToArray(f"dataset/{filename}"), exp_out])
+
+random.shuffle(data)
+
+training_data = data[:int(len(data) / 2)]
+validation_data = data[int(len(data) / 2):len(data)]
 
 network = Network(layers)
 network.reset(reset_settings)
-output = network.predict([1, 2])
-
-epochs = 10 ** 5
+epochs = 100
 learning_rate = 0.03
-print(output)
+
 for i in range(epochs):
-    network.train([1, 2], [1, 0], learning_rate)
+    if i % int(epochs / 100) == 0:
+        print("epoch " + str(i))
+    
+    for i, case in enumerate(training_data):
+        network.train(case[0], case[1], learning_rate)
 
-output = network.predict([1, 2])
-print(output)
+network.saveWeights("savedWeights/firstTraining")
 
-# https://www.youtube.com/watch?v=YOlOLxrMUOw&t=521s&ab_channel=DefendIntelligence
+print("TRAINING DATA")
+for case in training_data:
+    predicted = network.predict(case[0])
+    print(f"output: {predicted}")
+    print(f"expected: {case[1]}")
 
-#back propagation
-#  output neuron 1:
-#    target: 0
-#    result: 0.8
-#    error = (0-0.8)**2 --> -0.8**2
-#    error = 0.64
-#  error neuron 2: 0.0324
-
-# total error = mean(0.64, 0.0324)
-# total error = 0.3362
-
-# weight error = partial derivative(total error) / parial derivative(weight value)
-
-# weight error = ∂total error / ∂output2 *
-#                ∂output2 / ∂input2 *
-#                ∂input2 / ∂weight8
-
-# ∂total error / ∂output2 = output2 - target2
-# ∂output2 / ∂input2 = output2 * (1 - output2)
-# ∂input2 / ∂weight8 = output previous neuron
-
-# output2 = 0.82
-# target2 = 1
-# output previous neuron = 0.61
-
-# weight error = -0.18 * 0.1476 * 0.61
-# weight error = -0.016
-
-# new weight value = weight value - learning rate * weight error
-# new weight value = 0.52 - 0.1 * -0.016
-# new weight value = 0.5216
-
-# SAME THING FOR HIDDEN LAYER'S WEIGHTS
-
-# ∂total / ∂w4 = ∂Etotal / ∂outj2 * ∂outj2 / ∂inj2 * ∂inj2 / ∂w4
-
-# ∂Etotal / ∂outj2 = ∂Eo1 / ∂outj2 + ∂Eo2 / ∂outj2
-#   ∂Eo1 / ∂outj2 = ∂Eo1 / ∂ino1 * ∂ino1 / ∂outj2
-#      ∂Eo1 / ∂ino1 = ∂Eo1 / ∂outo1 * ∂outo1 / ∂ino1
-#      ∂ino1 / ∂outj2 = w5
-
-#   ∂Eo2 / ∂outj2 = ∂Eo2 / ∂ino2 * ∂ino2 / ∂outj2
-#      ∂Eo2 / ∂ino2 = ∂Eo2 / ∂outo2 * ∂outo2 / ∂ino2
-#      ∂ino2 / ∂outj2 = w8
-
-# ∂Etotal / ∂outj2 = ∂Etotal
-
-# ∂outj2 / ∂inj2 = outj2 * (1 - outj2)
-# ∂inj2 / ∂w4 = i2
-
-# new hidden weight value = hidden weight value - learning rate * hidden weight error
+print("VALIDATION DATA")
+for case in validation_data:
+    predicted = network.predict(case[0])
+    print(f"output: {predicted}")
+    print(f"expected: {case[1]}")
